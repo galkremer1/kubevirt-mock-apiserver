@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "clusters": [
+    {
+      "name": "local-cluster",
+      "namespaces": 3,
+      "vmsPerNamespace": 120,
+      "statusDistribution": { "Running": 0.6, "Stopped": 0.3, "Paused": 0.1 }
+    },
+    {
+      "name": "test-cluster",
+      "namespaces": 20,
+      "vmsPerNamespace": 120,
+      "statusDistribution": { "Running": 0.6, "Stopped": 0.3, "Paused": 0.1 }
+    }
+  ],
+  "server": {
+    "port": 8443,
+    "ui": false,
+    "uiPort": 8080
+  }
+}

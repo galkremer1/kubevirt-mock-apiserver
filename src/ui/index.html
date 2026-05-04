@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KubeVirt Mock Server — Control Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Red Hat Text", "RedHatText", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: #1b1d21;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #0f0f0f;
+      border-bottom: 1px solid #3c3f42;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+    header .badge {
+      background: #06c;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 49px); }
+
+    /* Status sidebar */
+    .sidebar {
+      background: #141517;
+      border-right: 1px solid #3c3f42;
+      padding: 20px 16px;
+    }
+    .sidebar h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #8a8d90; margin-bottom: 12px; }
+
+    .cluster-select { width: 100%; background: #27292d; border: 1px solid #3c3f42; border-radius: 4px; color: #e0e0e0; padding: 6px 10px; margin-bottom: 20px; font-size: 14px; }
+
+    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+    .status-card {
+      background: #27292d;
+      border: 1px solid #3c3f42;
+      border-radius: 6px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .status-card .count { font-size: 24px; font-weight: 700; }
+    .status-card .label { font-size: 11px; color: #8a8d90; margin-top: 2px; }
+    .status-Running  .count { color: #3e8635; }
+    .status-Stopped  .count { color: #8a8d90; }
+    .status-Paused   .count { color: #f0ab00; }
+    .status-Starting .count { color: #2b9af3; }
+    .status-Stopping .count { color: #c9190b; }
+    .status-Migrating .count { color: #a18fff; }
+    .status-CrashLoopBackOff .count { color: #c9190b; }
+
+    /* Main area */
+    .main { padding: 24px; overflow-y: auto; }
+
+    .section { margin-bottom: 28px; }
+    .section h2 { font-size: 14px; font-weight: 600; color: #c0c0c0; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #3c3f42; }
+
+    .action-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+    .count-input {
+      width: 70px;
+      background: #27292d;
+      border: 1px solid #3c3f42;
+      border-radius: 4px;
+      color: #e0e0e0;
+      padding: 6px 8px;
+      font-size: 14px;
+    }
+    .count-label { font-size: 13px; color: #8a8d90; }
+
+    button {
+      background: #27292d;
+      border: 1px solid #3c3f42;
+      border-radius: 4px;
+      color: #e0e0e0;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #353840; border-color: #5a5d60; }
+    button.primary { background: #06c; border-color: #06c; color: #fff; }
+    button.primary:hover { background: #0052cc; }
+    button.danger { background: #c9190b; border-color: #c9190b; color: #fff; }
+    button.danger:hover { background: #a30000; }
+    button.warning { background: #f0ab00; border-color: #f0ab00; color: #151515; }
+    button.warning:hover { background: #c58c00; }
+
+    /* Scenarios */
+    .scenario-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    /* Auto-mode */
+    .auto-row { display: flex; align-items: center; gap: 12px; }
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle input { display: none; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #3c3f42;
+      border-radius: 24px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      left: 3px; top: 3px;
+      width: 18px; height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #06c; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    /* Event log */
+    #event-log {
+      background: #0d0d0d;
+      border: 1px solid #3c3f42;
+      border-radius: 6px;
+      padding: 12px;
+      height: 280px;
+      overflow-y: auto;
+      font-family: "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-entry { display: flex; gap: 10px; }
+    .log-time { color: #5a5d60; flex-shrink: 0; }
+    .log-ADDED    { color: #3e8635; }
+    .log-MODIFIED { color: #2b9af3; }
+    .log-DELETED  { color: #c9190b; }
+    .log-INFO     { color: #8a8d90; }
+
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #27292d;
+      border: 1px solid #3c3f42;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KubeVirt Mock Server</h1>
+    <span class="badge">Control Panel</span>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Cluster</h2>
+      <select class="cluster-select" id="cluster-select"></select>
+
+      <h2>VM Status</h2>
+      <div class="status-grid" id="status-grid"></div>
+
+      <h2>Total VMs</h2>
+      <div id="total-vms" style="font-size:28px;font-weight:700;color:#fff;margin-bottom:20px;">—</div>
+
+      <button onclick="refreshState()" style="width:100%">↻ Refresh</button>
+    </aside>
+
+    <main class="main">
+      <div class="section">
+        <h2>Random Lifecycle Actions</h2>
+        <div class="action-grid">
+          <span class="count-label">Count:</span>
+          <input class="count-input" type="number" id="action-count" value="5" min="1" />
+          <button class="primary" onclick="doAction('start-random')">▶ Start Random</button>
+          <button onclick="doAction('stop-random')">⏹ Stop Random</button>
+          <button class="warning" onclick="doAction('pause-random')">⏸ Pause Random</button>
+          <button style="border-color:#a18fff;color:#a18fff" onclick="doAction('migrate-random')">⇄ Migrate Random</button>
+          <button class="danger" onclick="doAction('crash-random')">💥 Crash Random</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Scenarios</h2>
+        <div class="scenario-grid">
+          <button onclick="doScenario('rolling-restart')">↺ Rolling Restart</button>
+          <button class="danger" onclick="doScenario('mass-stop')">⏹ Mass Stop</button>
+          <button class="primary" onclick="doScenario('mass-start')">▶ Mass Start</button>
+          <button class="warning" onclick="doScenario('storm')">⚡ Event Storm</button>
+          <button class="danger" onclick="doReset()" style="margin-left:auto">⟳ Reset All</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Auto Mode</h2>
+        <div class="auto-row">
+          <label class="toggle">
+            <input type="checkbox" id="auto-toggle" onchange="toggleAuto()" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span id="auto-label" style="font-size:13px;color:#8a8d90">Disabled</span>
+          <span class="count-label">Events/sec:</span>
+          <input class="count-input" type="number" id="auto-rate" value="2" min="0.1" step="0.5" style="width:80px" />
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Event Log <small style="font-weight:400;color:#5a5d60;font-size:12px;margin-left:8px">(last 200 events)</small></h2>
+        <div id="event-log"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── Config ───────────────────────────────────────────────────────────────
+    const API = window.location.origin.replace(/:\d+$/, ':' + (parseInt(window.location.port || '8080', 10) + 363)); // points at :8443
+    // The control UI is served on uiPort (default 8080).
+    // The mock API runs on port (default 8443).
+    // We derive the API base from a data attribute injected by the server.
+    const API_BASE = document.currentScript?.dataset?.api || '/';
+
+    let autoTimer = null;
+
+    // ── State ────────────────────────────────────────────────────────────────
+
+    async function refreshState() {
+      try {
+        const r = await fetch(API_BASE + 'control/state');
+        const data = await r.json();
+        const clusterSel = document.getElementById('cluster-select');
+        const current = clusterSel.value;
+
+        // Populate cluster selector
+        const clusters = Object.keys(data);
+        if (clusterSel.options.length === 0) {
+          clusters.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            clusterSel.appendChild(opt);
+          });
+          if (current) clusterSel.value = current;
+        }
+
+        const cluster = clusterSel.value || clusters[0];
+        const counts = data[cluster] || {};
+
+        // Status grid
+        const grid = document.getElementById('status-grid');
+        grid.innerHTML = '';
+        const order = ['Running', 'Stopped', 'Paused', 'Starting', 'Stopping', 'Migrating', 'CrashLoopBackOff'];
+        const all = [...new Set([...order, ...Object.keys(counts)])];
+        let total = 0;
+        all.forEach(s => {
+          const n = counts[s] || 0;
+          if (n === 0 && !['Running', 'Stopped', 'Paused'].includes(s)) return;
+          total += n;
+          const card = document.createElement('div');
+          card.className = `status-card status-${s.replace(/\s+/g, '-')}`;
+          card.innerHTML = `<div class="count">${n}</div><div class="label">${s}</div>`;
+          grid.appendChild(card);
+        });
+        document.getElementById('total-vms').textContent = total;
+      } catch (e) {
+        logEntry('INFO', 'Failed to fetch state: ' + e.message);
+      }
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+
+    function getCluster() {
+      return document.getElementById('cluster-select').value || 'local-cluster';
+    }
+
+    async function doAction(op) {
+      const count = parseInt(document.getElementById('action-count').value, 10) || 1;
+      const cluster = getCluster();
+      try {
+        const r = await fetch(`${API_BASE}control/vms/${op}?count=${count}&cluster=${encodeURIComponent(cluster)}`, { method: 'POST' });
+        const d = await r.json();
+        showToast(`${op}: ${d.affected} VMs affected`);
+        logEntry('INFO', `${op} → ${d.affected} VMs (cluster: ${cluster})`);
+        setTimeout(refreshState, 500);
+      } catch (e) {
+        logEntry('INFO', `Error: ${e.message}`);
+      }
+    }
+
+    async function doScenario(scenario) {
+      const cluster = getCluster();
+      try {
+        const r = await fetch(`${API_BASE}control/scenario`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cluster, scenario }),
+        });
+        const d = await r.json();
+        showToast(`Scenario "${scenario}": ${d.affected ?? 0} VMs`);
+        logEntry('INFO', `scenario:${scenario} → ${d.affected ?? 0} VMs`);
+        setTimeout(refreshState, 600);
+      } catch (e) {
+        logEntry('INFO', `Error: ${e.message}`);
+      }
+    }
+
+    async function doReset() {
+      if (!confirm('Reset all VMs to initial generated state?')) return;
+      const cluster = getCluster();
+      try {
+        await fetch(`${API_BASE}control/reset?cluster=${encodeURIComponent(cluster)}`, { method: 'POST' });
+        showToast('Reset complete');
+        logEntry('INFO', `Reset cluster: ${cluster}`);
+        setTimeout(refreshState, 300);
+      } catch (e) {
+        logEntry('INFO', `Error: ${e.message}`);
+      }
+    }
+
+    // ── Auto mode ─────────────────────────────────────────────────────────────
+
+    function toggleAuto() {
+      const on = document.getElementById('auto-toggle').checked;
+      document.getElementById('auto-label').textContent = on ? 'Enabled' : 'Disabled';
+      if (on) {
+        startAuto();
+      } else {
+        clearTimeout(autoTimer);
+        autoTimer = null;
+      }
+    }
+
+    function startAuto() {
+      const rate = parseFloat(document.getElementById('auto-rate').value) || 1;
+      const ms = Math.round(1000 / rate);
+      const ops = ['start-random', 'stop-random', 'pause-random'];
+      const cluster = getCluster();
+
+      const tick = async () => {
+        if (!document.getElementById('auto-toggle').checked) return;
+        const op = ops[Math.floor(Math.random() * ops.length)];
+        try {
+          await fetch(`${API_BASE}control/vms/${op}?count=1&cluster=${encodeURIComponent(cluster)}`, { method: 'POST' });
+        } catch (_e) {}
+        autoTimer = setTimeout(tick, ms);
+      };
+      autoTimer = setTimeout(tick, ms);
+    }
+
+    // ── Watch stream (SSE-like over polling) ──────────────────────────────────
+    // We poll /control/state every 3s to update counts, but for the log
+    // we use a simple EventSource-style approach via a watch endpoint.
+
+    function connectWatchLog() {
+      const cluster = getCluster() || 'local-cluster';
+      // We use the K8s watch endpoint on the mock server directly
+      const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+      // The mock API is on a different port; we use HTTP polling of /control/events instead
+      // (a lightweight SSE endpoint we expose)
+      const evtSrc = new EventSource(`${API_BASE}control/events?cluster=${encodeURIComponent(cluster)}`);
+      evtSrc.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data);
+          logEntry(ev.type, `${ev.object?.metadata?.name} (${ev.object?.metadata?.namespace}) → ${ev.object?.status?.printableStatus}`);
+        } catch (_) {}
+      };
+      evtSrc.onerror = () => {
+        // Reconnect handled by browser
+      };
+    }
+
+    // ── Event log ─────────────────────────────────────────────────────────────
+
+    const MAX_LOG = 200;
+    let logEntries = [];
+
+    function logEntry(type, msg) {
+      const now = new Date().toLocaleTimeString();
+      logEntries.unshift({ msg, now, type });
+      if (logEntries.length > MAX_LOG) logEntries = logEntries.slice(0, MAX_LOG);
+      renderLog();
+    }
+
+    function renderLog() {
+      const el = document.getElementById('event-log');
+      el.innerHTML = logEntries.map(e =>
+        `<div class="log-entry"><span class="log-time">${e.now}</span><span class="log-${e.type}">[${e.type}]</span><span>${e.msg}</span></div>`
+      ).join('');
+    }
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+
+    let toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+
+    refreshState();
+    setInterval(refreshState, 3000);
+    connectWatchLog();
+  </script>
+</body>
+</html>

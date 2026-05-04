@@ -17,25 +17,24 @@ All data paths in the plugin work unchanged — no mocks at the SDK level.
 
 ```bash
 # 1. Install dependencies (first time only)
-npm run mock-server:install   # from the repo root, OR:
-cd mock-apiserver && npm install
+cd kubevirt-mock-apiserver && npm install
 
-# 2. Start the mock server (uses mock-apiserver/config.json)
-npm run mock-server           # headless
-npm run mock-server:ui        # with control panel at http://localhost:8080
+# 2. Start the mock server (uses config.json)
+npm start           # headless
+npm run start:ui    # with control panel at http://localhost:8080
 
 # 3. Start the plugin webpack dev server (in another terminal)
-npm run dev
+cd kubevirt-plugin && npm run dev
 
 # 4. Start the Console container pointed at the mock server (in another terminal)
-npm run start-console-mock
+cd kubevirt-plugin && npm run start-console-mock
 ```
 
 Open `http://localhost:9000` — the full kubevirt-plugin UI backed entirely by mock data.
 
 ## Configuration
 
-Edit `mock-apiserver/config.json`:
+Edit `config.json`:
 
 ```json
 {
@@ -129,3 +128,18 @@ All Prometheus queries go through `BRIDGE_K8S_MODE_OFF_CLUSTER_THANOS` → `/tha
 | `MOCK_PORT` | `8443` | Port the mock server listens on |
 | `CONSOLE_IMAGE` | `quay.io/openshift/origin-console:latest` | Console image |
 | `CONSOLE_PORT` | `9000` | Local port for the Console UI |
+
+## Fleet / Multicluster View
+
+The Fleet Virtualization perspective (spoke-cluster view) is normally only activated when the MCE/ACM Console plugin is running, because that plugin sets the `MULTICLUSTER_SDK_PROVIDER_1` feature flag. To reach this view with just the mock server you need a one-line change in `kubevirt-plugin`:
+
+**`src/utils/flags/enableKubevirtDynamicFlag.ts`** — add the flag alongside `FLAG_KUBEVIRT_DYNAMIC`:
+
+```ts
+export const enableKubevirtDynamicFlag = (setFeatureFlag: SetFeatureFlag) => {
+  setFeatureFlag(FLAG_KUBEVIRT_DYNAMIC, true);
+  setFeatureFlag('MULTICLUSTER_SDK_PROVIDER_1', true); // enables fleet view without ACM
+};
+```
+
+This is safe in production: without a real ACM hub the subsequent hub-config fetch fails, which keeps `FLAG_DISALLOWED_KUBEVIRT_DYNAMIC_ACM` set to `true` and hides the fleet perspective from end users — so there is no UX regression.

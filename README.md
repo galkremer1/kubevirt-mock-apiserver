@@ -138,6 +138,6 @@ The Fleet Virtualization perspective (spoke-cluster view) is normally only activ
 ```ts
 export const enableKubevirtDynamicFlag = (setFeatureFlag: SetFeatureFlag) => {
   setFeatureFlag(FLAG_KUBEVIRT_DYNAMIC, true);
-  setFeatureFlag("MULTICLUSTER_SDK_PROVIDER_1", true); // enables fleet view without ACM
+  setFeatureFlag("MULTICLUSTER_SDK_PROVIDER_1", true); // enables fleet view without ACM mode
 };
 ```
